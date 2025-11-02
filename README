@@ -1,0 +1,14 @@
+genz-fin-advisor/
+├─ .env.example
+├─ README.md
+├─ requirements.txt
+├─ Makefile
+├─ app/
+│  ├─ streamlit_app.py
+│  ├─ engine.py
+│  ├─ data_generator.py
+│  ├─ utils.py
+│  └─ ui.py
+├─ tests/
+│  └─ test_engine.py
+└─ .gitignore
