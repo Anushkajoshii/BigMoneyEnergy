@@ -1,5 +1,17 @@
+# .gitignore
 __pycache__/
-.venv/
-.env
 *.pyc
-streamlit-* 
+*.pyo
+*.pyd
+.env
+.venv/
+*.sqlite3
+*.db
+.DS_Store
+*.log
+*.zip
+*.tar.gz
+*.h5
+*.pkl
+*.csv
+*.parquet
