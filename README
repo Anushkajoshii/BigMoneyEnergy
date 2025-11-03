@@ -1,3 +1,5 @@
+1st
+
 genz-fin-advisor/
 ├─ .env.example
 ├─ README.md
@@ -12,3 +14,35 @@ genz-fin-advisor/
 ├─ tests/
 │  └─ test_engine.py
 └─ .gitignore
+
+
+2nd
+
+genz-fin-advisor/
+├─ .env.example
+├─ README.md
+├─ requirements.txt
+├─ Makefile
+├─ app/
+│  ├─ streamlit_app.py        # UPDATED: main app (generalized product + new UI tabs)
+│  ├─ engine.py               # unchanged (Monte Carlo, rules)
+│  ├─ data_generator.py       # unchanged (synthetic data)
+│  ├─ utils.py                # UPDATED: add report export helpers (Excel + PDF)
+│  ├─ ui.py                   # UPDATED: inputs_panel generalized
+│  ├─ advisor_ai.py           # NEW: LLM wrapper (OpenAI/Groq-ready)
+│  ├─ models/
+│  │   ├─ model.py            # UPDATED/NEW: predictive regression + save/load API
+│  │   └─ lstm_placeholder.py # NEW: optional LSTM placeholder (optional dependency)
+│  └─ dashboard/
+│      ├─ dashboard.py        # UPDATED: comparison dashboard (Buy vs Wait)
+│      └─ __init__.py
+├─ tests/
+│  ├─ test_engine.py
+│  ├─ test_reports.py         # NEW: tests for report generation
+│  └─ test_models.py          # NEW: tests for model pipeline
+├─ .github/
+│  └─ workflows/
+│      └─ ci.yml              # NEW: GitHub Actions to run tests
+└─ .gitignore
+
+
