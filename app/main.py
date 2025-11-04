@@ -18,6 +18,11 @@ from app.utils import fan_chart_figure, final_savings_histogram
 
 st.set_page_config(page_title="GenZ Finance Advisor", layout="wide")
 
+<<<<<<< HEAD
+=======
+st.set_page_config(page_title="GenZ Finance Advisor", layout="wide")
+
+>>>>>>> f08dc33 (included 3 types with pdf report)
 st.title("💸 GenZ Finance Advisor — Should You Buy It?")
 st.write("Simulate your financial health before making a purchase. Works for cars, luxury items, gadgets, or any goal!")
 
