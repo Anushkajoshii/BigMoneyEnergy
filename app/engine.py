@@ -1,134 +1,119 @@
-# app/engine.py
 import numpy as np
-import pandas as pd
+from app.utils import fan_chart_figure
 
-def rule_checks(snapshot: dict, loan_monthly_payment: float) -> dict:
-    """
-    Run quick rule-based checks and return dictionary with flags and messages.
-    snapshot keys: monthly_net_income, fixed_expenses, variable_expenses, savings_balance, emergency_target, debt_monthly, debt_total
-    """
-    income = float(snapshot.get("monthly_net_income", 0))
-    fixed = float(snapshot.get("fixed_expenses", 0))
-    variable = float(snapshot.get("variable_expenses", 0))
-    savings = float(snapshot.get("savings_balance", 0))
-    emergency_target = float(snapshot.get("emergency_target", 0))
-    debt_monthly = float(snapshot.get("debt_monthly", 0))
+def calculate_loan_monthly_payment(price, down_payment, apr, term_months):
+    """Calculate EMI for loan-based purchases."""
+    loan_amount = price - down_payment
+    if loan_amount <= 0 or term_months <= 0:
+        return 0
 
-    essential = fixed + variable
-    monthly_available = income - essential - debt_monthly
-    if monthly_available < 0:
-        monthly_available = 0
+    # Handle zero-interest loans separately
+    if apr == 0:
+        return loan_amount / term_months
 
-    # DTI: (existing debt payments + new loan payment) / income
-    dti = (debt_monthly + loan_monthly_payment) / (income + 1e-9)
+    r = apr / 12 / 100
+    return loan_amount * r * (1 + r) ** term_months / ((1 + r) ** term_months - 1)
+
+
+def rule_checks(snapshot, monthly_payment):
+    """Basic affordability checks."""
+    dti = (snapshot["debt_monthly"] + monthly_payment) / snapshot["monthly_net_income"]
+    safe = dti < 0.36 and snapshot["savings_balance"] >= snapshot["emergency_target"]
 
     messages = []
-    safe = True
+    if dti >= 0.36:
+        messages.append(f"High Debt-to-Income ratio ({dti:.2f}). Try lowering EMI or debts.")
+    if snapshot["savings_balance"] < snapshot["emergency_target"]:
+        messages.append("Emergency fund below target.")
 
-    # emergency fund check
-    if savings < emergency_target:
-        messages.append(f"Emergency fund below target: {savings:.0f} vs target {emergency_target:.0f}")
-        safe = False
-
-    # DTI threshold (example: 0.36)
-    if dti > 0.36:
-        messages.append(f"Debt-to-income ratio would be {dti:.2f} (> 0.36 recommended).")
-        safe = False
-
-    # monthly payment should not exceed, say, 15% of income
-    if loan_monthly_payment / (income + 1e-9) > 0.15:
-        messages.append(f"New loan monthly payment {loan_monthly_payment:.0f} is >15% of monthly income.")
-        safe = False
-
-    return {"safe": safe, "messages": messages, "dti": dti, "monthly_available": monthly_available}
+    return {"safe": safe, "messages": messages, "dti": dti}
 
 
-def calculate_loan_monthly_payment(price: float, down_payment: float, apr: float, term_months: int) -> float:
-    """Simple amortizing loan monthly payment formula."""
-    principal = max(0.0, price - down_payment)
-    if principal <= 0 or apr <= 0 or term_months <= 0:
-        # handle zero-interest or fully paid downpayment
-        if term_months <= 0:
-            return 0.0
-        return principal / term_months
-    monthly_rate = apr / 12.0
-    payment = (principal * monthly_rate) / (1 - (1 + monthly_rate) ** (-term_months))
-    return float(payment)
+
+def monte_carlo_purchase_risk(
+    snapshot,
+    price,
+    down_payment,
+    apr,
+    term_months,
+    months_ahead,
+    sims,
+    purchase_type="One-time purchase",
+    buy_in_months=0,
+):
+    """Simulate future savings under uncertainty and compute probability of shortfall."""
+
+    np.random.seed(42)
+
+    # Extract snapshot safely
+    monthly_income = snapshot.get("monthly_net_income", 0)
+    fixed_exp = snapshot.get("fixed_expenses", 0)
+    var_exp = snapshot.get("variable_expenses", 0)
+    savings = snapshot.get("savings_balance", 0)
+    add_savings = snapshot.get("monthly_additional_savings", 0)
+    emergency_target = snapshot.get("emergency_target", 100000)
+    debt_monthly = snapshot.get("debt_monthly", 0)
+
+    # Loan setup
+    # loan_amount = max(price - down_payment, 0)
+    # if loan_amount > 0:
+    #     monthly_rate = apr / 12
+    #     loan_payment = loan_amount * monthly_rate / (1 - (1 + monthly_rate) ** -term_months)
+    # else:
+    #     loan_payment = 0
+    loan_amount = max(price - down_payment, 0)
+    if loan_amount > 0 and term_months > 0:
+        if apr == 0:
+            loan_payment = loan_amount / term_months
+        else:
+            monthly_rate = apr / 12
+            loan_payment = loan_amount * monthly_rate / (1 - (1 + monthly_rate) ** -term_months)
+    else:
+        loan_payment = 0
 
 
-def monte_carlo_purchase_risk(snapshot: dict,
-                              price: float,
-                              down_payment: float,
-                              apr: float,
-                              term_months: int,
-                              months_ahead: int = 12,
-                              sims: int = 3000,
-                              income_volatility: float = 0.05,
-                              expense_shock_prob: float = 0.05,
-                              expense_shock_scale: float = 0.5):
-    """
-    Run Monte Carlo simulation to estimate probability of shortfall in next `months_ahead` months if purchase happens now.
-    Returns dict with probability_of_shortfall, distribution of final savings, and summary stats.
-    """
-    income = float(snapshot.get("monthly_net_income", 0))
-    fixed = float(snapshot.get("fixed_expenses", 0))
-    variable = float(snapshot.get("variable_expenses", 0))
-    savings = float(snapshot.get("savings_balance", 0))
-    emergency_target = float(snapshot.get("emergency_target", 0))
-    debt_monthly = float(snapshot.get("debt_monthly", 0))
-    monthly_contribution = float(snapshot.get("monthly_additional_savings", 0))  # user action
 
-    # monthly loan payment
-    loan_payment = calculate_loan_monthly_payment(price, down_payment, apr, term_months)
-
-    # precompute monthly essential expenses
-    base_essential = fixed + variable
-
-    rng = np.random.default_rng(seed=42)
+    # Simulate monthly income and expenses variation
+    income_sd = 0.05 * monthly_income
+    var_exp_sd = 0.1 * var_exp
 
     final_savings = np.zeros(sims)
-    shortfall_flags = np.zeros(sims, dtype=bool)
 
-    for sim in range(sims):
-        s = savings
-        # simulate month by month
+    for s in range(sims):
+        cash = savings
         for m in range(months_ahead):
-            # simulate income shock: income ~ N(income, income*income_volatility)
-            inc = rng.normal(income, max(1e-6, income * income_volatility))
-            inc = max(0.0, inc)
+            income = np.random.normal(monthly_income, income_sd)
+            expenses = np.random.normal(var_exp, var_exp_sd) + fixed_exp + debt_monthly
 
-            # expense shock: with some small probability a big unexpected expense occurs
-            if rng.random() < expense_shock_prob:
-                shock = base_essential * expense_shock_scale * rng.random()
-            else:
-                shock = 0.0
+            # Add savings and subtract loan if purchase has been made
+            cash += income - expenses
+            cash += add_savings
 
-            # monthly expenses
-            essential = base_essential + shock
+            if m >= buy_in_months:
+                cash -= loan_payment
 
-            # monthly net change = inc - essential - debt_monthly - loan_payment + monthly_contribution
-            delta = inc - essential - debt_monthly - loan_payment + monthly_contribution
-
-            s = s + delta
-            # floor at large negative allowed (representing borrowing), but we just track shortfall
-            if s < -1e6:
-                s = -1e6
-
-            # check early shortfall: if emergency fund (savings) falls below emergency_target at any month -> shortfall
-            if s < emergency_target:
-                shortfall_flags[sim] = True
-                # we can break early if desired, but continue to build distribution
-                # break
-
-        final_savings[sim] = s
-
-    prob_shortfall = float(np.mean(shortfall_flags))
+        final_savings[s] = cash
+    # Compute statistics
+    prob_shortfall = float(np.mean(final_savings < emergency_target))
     stats = {
-        "prob_shortfall": prob_shortfall,
         "final_savings_mean": float(np.mean(final_savings)),
         "final_savings_median": float(np.median(final_savings)),
         "final_savings_p10": float(np.percentile(final_savings, 10)),
         "final_savings_p90": float(np.percentile(final_savings, 90)),
-        "loan_payment": float(loan_payment)
     }
-    return {"stats": stats, "final_savings": final_savings, "shortfall_flags": shortfall_flags}
+
+    # Create a simple simulated trajectory matrix for visualization
+    sim_matrix = np.tile(final_savings, (months_ahead, 1)).T  # fake paths just for chart
+
+    # return {
+    #     "prob_shortfall": prob_shortfall,
+    #     "final_savings": final_savings,
+    #     "stats": stats,
+    #     "chart": fan_chart_figure(sim_matrix, months_ahead)
+    # }
+    return {
+    "sim_matrix": sim_matrix,  # shape: (sims, months_ahead)
+    "final_savings": final_savings,
+    "prob_shortfall": prob_shortfall,
+    "stats": stats
+}

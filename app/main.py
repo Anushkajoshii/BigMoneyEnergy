@@ -1,114 +1,25 @@
-# # app/main.py
-# import streamlit as st
-# import sys, os
-# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-# from app.ui import inputs_panel
-# from app.engine import calculate_loan_monthly_payment, rule_checks, monte_carlo_purchase_risk
-# from app.utils import fan_chart_figure
-# import pandas as pd
-
-# st.set_page_config(page_title="GenZ Finance Advisor (MVP)", layout="wide")
-
-# st.title("GenZ Finance Advisor — Can I buy a BMW? (MVP)")
-# st.write("This is a prototype advisory tool. Not a substitute for professional financial advice.")
-
-# # Collect inputs
-# inputs = inputs_panel()
-
-# snapshot = {
-#     "monthly_net_income": inputs["monthly_net_income"],
-#     "fixed_expenses": inputs["fixed_expenses"],
-#     "variable_expenses": inputs["variable_expenses"],
-#     "savings_balance": inputs["savings_balance"],
-#     "emergency_target": inputs["emergency_target"],
-#     "debt_monthly": inputs["debt_monthly"],
-#     "monthly_additional_savings": inputs["monthly_additional_savings"]
-# }
-
-# loan_payment = calculate_loan_monthly_payment(inputs["car_price"], inputs["down_payment"], inputs["apr"], inputs["term_months"])
-
-# st.header("Quick Eligibility Checks")
-# checks = rule_checks(snapshot, loan_payment)
-# if checks["safe"]:
-#     st.success("Basic rule checks passed ✅")
-# else:
-#     st.error("Basic rule checks flagged issues ❗")
-
-# for m in checks["messages"]:
-#     st.write("- " + m)
-
-# st.write(f"Estimated monthly loan payment: {loan_payment:,.0f}")
-
-# st.header("Monte Carlo risk simulation")
-# horizon_months = st.slider("Simulation horizon (months)", min_value=6, max_value=60, value=24, step=6)
-# sims = st.selectbox("Number of simulations", options=[1000, 3000, 5000], index=1)
-
-# with st.spinner("Running simulation..."):
-#     mc = monte_carlo_purchase_risk(snapshot,
-#                                    price=inputs["car_price"],
-#                                    down_payment=inputs["down_payment"],
-#                                    apr=inputs["apr"],
-#                                    term_months=inputs["term_months"],
-#                                    months_ahead=horizon_months,
-#                                    sims=sims)
-
-# prob = mc["stats"]["prob_shortfall"]
-# st.metric("Probability of emergency-fund shortfall within horizon", f"{prob*100:.1f}%")
-
-# col1, col2 = st.columns([2, 1])
-# with col1:
-#     fig = fan_chart_figure(mc["final_savings"], snapshot["savings_balance"],
-#                            title=f"Distribution of final savings after {horizon_months} months")
-#     st.plotly_chart(fig, use_container_width=True)
-
-# with col2:
-#     st.subheader("Simulation summary")
-#     s = mc["stats"]
-#     st.write(pd.DataFrame({
-#         "stat": ["prob_shortfall", "mean_final_savings", "median_final_savings", "p10", "p90", "loan_monthly_payment"],
-#         "value": [f"{s['prob_shortfall']:.2f}", f"{s['final_savings_mean']:.0f}", f"{s['final_savings_median']:.0f}",
-#                   f"{s['final_savings_p10']:.0f}", f"{s['final_savings_p90']:.0f}", f"{s['loan_payment']:.0f}"]
-#     }))
-
-# st.header("Recommendation")
-# threshold = st.slider("Acceptable shortfall probability threshold", min_value=0.0, max_value=1.0, value=0.2, step=0.05)
-# if prob <= threshold and checks["safe"]:
-#     st.success("Recommendation: You *can* consider buying now (according to this model).")
-# else:
-#     st.warning("Recommendation: Not advisable to buy now. Consider delaying or increasing savings.")
-#     # Show simple actionable suggestions
-#     deficit_note = ""
-#     if snapshot["savings_balance"] < snapshot["emergency_target"]:
-#         deficit_note += f"- Increase emergency funds by {snapshot['emergency_target'] - snapshot['savings_balance']:.0f}.\n"
-#     if checks["dti"] > 0.36:
-#         deficit_note += f"- Lower monthly debt or down payment larger to reduce DTI.\n"
-#     st.write("Suggested actions:")
-#     st.write(deficit_note or "Consider small changes: increase monthly savings, reduce discretionary spend, raise down payment.")
-
-# st.header("EDA (quick view)")
-# st.write("Monthly snapshot:")
-# st.table(pd.DataFrame([snapshot]).T.rename(columns={0:"value"}))
 
 
-# app/streamlit_app.py
+import sys, os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import streamlit as st
+import pandas as pd
+from io import BytesIO
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet
+
 from app.ui import inputs_panel
 from app.engine import calculate_loan_monthly_payment, rule_checks, monte_carlo_purchase_risk
-from app.utils import fan_chart_figure, create_excel_report, create_pdf_report
-from app.models.model import predict, load_model
-from app.advisor_ai import get_ai_explanation
-from app.dashboard.dashboard import compare_buy_vs_wait
-import pandas as pd
-import numpy as np
-import sys, os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from app.utils import fan_chart_figure, final_savings_histogram
 
+st.set_page_config(page_title="GenZ Finance Advisor", layout="wide")
 
-st.set_page_config(page_title="GenZ Finance Advisor (MVP)", layout="wide")
-st.title("GenZ Finance Advisor — Personalized Purchase Planner")
-
-st.write("Prototype advisory tool. Not financial advice.")
+st.title("💸 GenZ Finance Advisor — Should You Buy It?")
+st.write("Simulate your financial health before making a purchase. Works for cars, luxury items, gadgets, or any goal!")
 
 inputs = inputs_panel()
 
@@ -119,105 +30,137 @@ snapshot = {
     "savings_balance": inputs["savings_balance"],
     "emergency_target": inputs["emergency_target"],
     "debt_monthly": inputs["debt_monthly"],
-    "monthly_additional_savings": inputs["monthly_additional_savings"]
+    "monthly_additional_savings": inputs["monthly_additional_savings"],
 }
 
-product_name = inputs["product_name"]
-product_price = inputs["product_price"]
-down_payment = inputs["down_payment"]
-apr = inputs["apr"]
-term_months = inputs["term_months"]
+# EMI calculation only if needed
+loan_payment = 0
+if inputs["purchase_type"] == "EMI-based purchase":
+    loan_payment = calculate_loan_monthly_payment(
+        inputs["car_price"], inputs["down_payment"], inputs["apr"], inputs["term_months"]
+    )
 
-tab1, tab2, tab3 = st.tabs(["Recommendation", "Buy vs Wait", "Download Report"])
+# Quick check
+st.header("🔍 Quick Affordability Check")
+checks = rule_checks(snapshot, loan_payment)
+if checks["safe"]:
+    st.success("✅ Financial rules look good.")
+else:
+    st.warning("⚠️ Some financial stress indicators detected.")
+for msg in checks["messages"]:
+    st.write("- " + msg)
 
-with tab1:
-    st.header(f"Recommendation for: {product_name} (₹{product_price:,.0f})")
-    loan_payment = calculate_loan_monthly_payment(product_price, down_payment, apr, term_months)
-    checks = rule_checks(snapshot, loan_payment)
-    if checks["safe"]:
-        st.success("Basic rule checks passed ✅")
-    else:
-        st.error("Basic rule checks flagged issues ❗")
-    for m in checks["messages"]:
-        st.write("- " + m)
-    st.write(f"Estimated monthly loan payment: {loan_payment:,.0f}")
+if inputs["purchase_type"] == "EMI-based purchase":
+    st.write(f"Estimated EMI: ₹{loan_payment:,.0f}/month")
 
-    horizon_months = st.slider("Simulation horizon (months)", min_value=6, max_value=60, value=24, step=6, key="horizon")
-    sims = st.selectbox("Number of simulations", options=[1000, 3000, 5000], index=1)
-    with st.spinner("Running simulation..."):
-        mc = monte_carlo_purchase_risk(snapshot,
-                                       price=product_price,
-                                       down_payment=down_payment,
-                                       apr=apr,
-                                       term_months=term_months,
-                                       months_ahead=horizon_months,
-                                       sims=sims)
-    prob = mc["stats"]["prob_shortfall"]
-    st.metric("Probability of emergency-fund shortfall within horizon", f"{prob*100:.1f}%")
+# Run simulation
+st.header("🎲 Monte Carlo Risk Simulation")
+horizon_months = st.slider("Simulation horizon (months)", 6, 60, 24, 6)
+sims = st.selectbox("Number of simulations", [1000, 3000, 5000], index=1)
 
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        fig = fan_chart_figure(mc["final_savings"], snapshot["savings_balance"],
-                               title=f"Distribution of final savings after {horizon_months} months")
-        st.plotly_chart(fig, use_container_width=True)
-    with col2:
-        s = mc["stats"]
-        st.write(pd.DataFrame({
-            "stat": ["prob_shortfall", "mean_final_savings", "median_final_savings", "p10", "p90", "loan_monthly_payment"],
-            "value": [f"{s['prob_shortfall']:.2f}", f"{s['final_savings_mean']:.0f}", f"{s['final_savings_median']:.0f}",
-                      f"{s['final_savings_p10']:.0f}", f"{s['final_savings_p90']:.0f}", f"{s['loan_payment']:.0f}"]
-        }))
+with st.spinner("Running financial simulation..."):
+    mc = monte_carlo_purchase_risk(
+        snapshot,
+        price=inputs["car_price"],
+        down_payment=inputs["down_payment"],
+        apr=inputs["apr"],
+        term_months=inputs["term_months"],
+        months_ahead=horizon_months,
+        sims=sims,
+        purchase_type=inputs["purchase_type"],
+        buy_in_months=inputs["buy_in_months"],
+    )
+    
+st.subheader("📊 Monte Carlo Results")
 
-    threshold = st.slider("Acceptable shortfall probability threshold", min_value=0.0, max_value=1.0, value=0.2, step=0.05)
-    if prob <= threshold and checks["safe"]:
-        recommendation = "buy_now"
-        st.success("Recommendation: You *can* consider buying now (according to this model).")
-    else:
-        recommendation = "wait"
-        st.warning("Recommendation: Not advisable to buy now. Consider delaying or increasing savings.")
-        deficit_note = ""
-        if snapshot["savings_balance"] < snapshot["emergency_target"]:
-            deficit_note += f"- Increase emergency funds by {snapshot['emergency_target'] - snapshot['savings_balance']:.0f}.\n"
-        if checks["dti"] > 0.36:
-            deficit_note += f"- Lower monthly debt or raise down payment to reduce DTI.\n"
-        st.write("Suggested actions:")
-        st.write(deficit_note or "Consider increasing monthly savings, reduce discretionary spend, or raise down payment.")
+col1, col2 = st.columns(2)
 
-    # AI explanation panel
-    st.header("AI explanation")
-    ai_text = get_ai_explanation(snapshot, product_name, mc["stats"], recommendation)
-    st.write(ai_text)
+with col1:
+    st.markdown("### Savings Growth Over Time")
+    fan_chart_img = fan_chart_figure(mc["sim_matrix"], months_ahead=horizon_months)
+    st.image(fan_chart_img, caption="Monte Carlo Savings Projection")
 
-    # ML predicted monthly savings (if model present)
-    model = load_model()
-    if model:
-        pred = predict(snapshot)
-        st.info(f"Model-predicted monthly savings (based on population priors): ₹{pred:,.0f}")
-    else:
-        st.info("No predictive model found. Train one with `app/models/model.train` on synthetic data or your own dataset.")
+with col2:
+    st.markdown("### Final Savings Distribution")
+    hist_fig = final_savings_histogram(
+        final_savings_array=mc["final_savings"],
+        baseline_savings=snapshot.get("savings_balance", 0)
+    )
+    st.plotly_chart(hist_fig, width='stretch')
 
-with tab2:
-    st.header("Buy vs Wait comparison")
-    extra_options = st.multiselect("Test extra monthly savings (₹)", options=[0, 5000, 10000, 20000], default=[0, 5000])
-    with st.spinner("Running scenario comparisons..."):
-        scenarios = compare_buy_vs_wait(snapshot, product_price, down_payment, apr, term_months, horizon_months, sims, extra_options)
-    df_rows = []
-    for s in scenarios:
-        st.write(f"Scenario: {s['scenario']} | extra_savings={s.get('extra_savings',0)} | months_wait={s.get('months_wait','now')}")
-        st.write(s['stats'])
-        df_rows.append({
-            "scenario": s['scenario'],
-            "extra": s.get('extra_savings',0),
-            "months_wait": s.get('months_wait',0),
-            "prob_shortfall": s['stats']['prob_shortfall'],
-            "loan_payment": s['stats']['loan_payment']
-        })
-    st.write(pd.DataFrame(df_rows).sort_values(["prob_shortfall","months_wait"]))
 
-with tab3:
-    st.header("Download report")
-    # create bytes
-    excel_bytes = create_excel_report(snapshot, mc["stats"])
-    pdf_bytes = create_pdf_report(snapshot, mc["stats"], product_name, horizon_months)
-    st.download_button("Download Excel report", data=excel_bytes, file_name=f"{product_name}_finance_report.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    st.download_button("Download PDF report", data=pdf_bytes, file_name=f"{product_name}_finance_report.pdf", mime="application/pdf")
+
+# Recommendation
+st.header("🧠 Recommendation")
+threshold = st.slider("Acceptable shortfall probability", 0.0, 1.0, 0.2, 0.05)
+recommendation = ""
+prob = mc["prob_shortfall"]
+if prob <= threshold and checks["safe"]:
+    recommendation = f"You can consider buying {inputs['product_name']} now 🎉"
+    st.success(recommendation)
+else:
+    recommendation = f"Hold off on buying {inputs['product_name']} — build more buffer."
+    st.warning(recommendation)
+    st.write("- Increase monthly savings or delay purchase.")
+    st.write("- Reduce price range or EMI duration for safer outcomes.")
+
+st.header("📊 Financial Snapshot")
+st.table(pd.DataFrame([snapshot]).T.rename(columns={0: "Value"}))
+
+# -------------------------------------------------------------------
+# 📄 REPORT DOWNLOAD SECTION
+# -------------------------------------------------------------------
+st.header("📄 Download Your Financial Report")
+
+def generate_pdf_report(inputs, snapshot, mc, recommendation, prob):
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    styles = getSampleStyleSheet()
+    elements = []
+
+    elements.append(Paragraph("💸 GenZ Finance Advisor Report", styles["Title"]))
+    elements.append(Spacer(1, 12))
+
+    elements.append(Paragraph(f"<b>Product:</b> {inputs['product_name']}", styles["Normal"]))
+    elements.append(Paragraph(f"<b>Purchase Type:</b> {inputs['purchase_type']}", styles["Normal"]))
+    elements.append(Paragraph(f"<b>Price:</b> ₹{inputs['car_price']:,.0f}", styles["Normal"]))
+    elements.append(Spacer(1, 12))
+
+    elements.append(Paragraph("📊 <b>Financial Snapshot</b>", styles["Heading2"]))
+    data = [["Metric", "Value"]] + [[k.replace("_", " ").title(), f"₹{v:,.0f}" if isinstance(v, (int, float)) else v] for k, v in snapshot.items()]
+    table = Table(data, hAlign="LEFT")
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold')
+    ]))
+    elements.append(table)
+    elements.append(Spacer(1, 12))
+
+    elements.append(Paragraph("🎲 <b>Monte Carlo Simulation Summary</b>", styles["Heading2"]))
+    stats_table = Table([["Metric", "Value"]] + [[k, f"{v:.3f}" if isinstance(v, float) else v] for k, v in mc["stats"].items()])
+    stats_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+    ]))
+    elements.append(stats_table)
+    elements.append(Spacer(1, 12))
+
+    elements.append(Paragraph(f"<b>Probability of Shortfall:</b> {prob*100:.1f}%", styles["Normal"]))
+    elements.append(Spacer(1, 12))
+
+    elements.append(Paragraph("🧠 <b>Recommendation</b>", styles["Heading2"]))
+    elements.append(Paragraph(recommendation, styles["Normal"]))
+
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer
+
+pdf_buffer = generate_pdf_report(inputs, snapshot, mc, recommendation, prob)
+st.download_button(
+    label="📥 Download Financial Report (PDF)",
+    data=pdf_buffer,
+    file_name=f"{inputs['product_name']}_finance_report.pdf",
+    mime="application/pdf",
+)
+
