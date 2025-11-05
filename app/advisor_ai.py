@@ -58,10 +58,12 @@
 import os
 import json
 import textwrap
+import streamlit as st
 from groq import Groq
 from dotenv import load_dotenv
 load_dotenv()
 
+groq_api_key = st.secrets["GROQ_API_KEY"]
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", None)
 
