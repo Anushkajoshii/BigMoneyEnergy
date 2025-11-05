@@ -74,9 +74,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-
-# st.title("💸 GenZ Finance Advisor — Should You Buy It?")
-# st.write("Simulate your financial health before making a purchase. Works for cars, luxury items, gadgets, or any goal!")
 st.markdown(
     """
     <div style="text-align:center; padding: 1.5rem 0;">
