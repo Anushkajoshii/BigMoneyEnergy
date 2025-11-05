@@ -68,5 +68,6 @@ openpyxl>=3.0
 reportlab>=4.0
 python-dotenv>=1.0
 requests>=2.30
+groq
 # Optional if you want LSTM:
 # tensorflow>=2.12

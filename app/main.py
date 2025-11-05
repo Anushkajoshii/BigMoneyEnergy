@@ -15,6 +15,10 @@ from reportlab.lib.styles import getSampleStyleSheet
 from app.ui import inputs_panel
 from app.engine import calculate_loan_monthly_payment, rule_checks, monte_carlo_purchase_risk
 from app.utils import fan_chart_figure, final_savings_histogram
+from app.advisor_ai import get_ai_explanation
+
+from dotenv import load_dotenv
+load_dotenv()
 
 st.set_page_config(page_title="GenZ Finance Advisor", layout="wide")
 
@@ -103,6 +107,15 @@ else:
     st.warning(recommendation)
     st.write("- Increase monthly savings or delay purchase.")
     st.write("- Reduce price range or EMI duration for safer outcomes.")
+ai_text = get_ai_explanation(
+    snapshot,
+    inputs['product_name'],
+    {"prob_shortfall": mc["prob_shortfall"], "loan_payment": loan_payment, **mc["stats"]},
+    recommendation
+)
+
+st.markdown("### 💬 AI Advisor’s Take")
+st.write(ai_text)
 
 st.header("📊 Financial Snapshot")
 st.table(pd.DataFrame([snapshot]).T.rename(columns={0: "Value"}))
