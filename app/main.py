@@ -21,9 +21,74 @@ from dotenv import load_dotenv
 load_dotenv()
 
 st.set_page_config(page_title="GenZ Finance Advisor", layout="wide")
+st.markdown(
+    """
+    <style>
+        /* Base fonts & layout */
+        html, body, [class*="css"] {
+            font-family: 'Inter', sans-serif;
+        }
 
-st.title("💸 GenZ Finance Advisor — Should You Buy It?")
-st.write("Simulate your financial health before making a purchase. Works for cars, luxury items, gadgets, or any goal!")
+        /* Titles */
+        h1, h2, h3 {
+            font-weight: 700 !important;
+        }
+
+        /* Buttons */
+        .stButton>button {
+            background: linear-gradient(90deg, #6C63FF, #00C9A7);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            padding: 0.6rem 1.2rem;
+            font-weight: 600;
+            transition: 0.3s ease;
+        }
+        .stButton>button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(108,99,255,0.4);
+        }
+
+        /* Section headers */
+        .stHeader, h2, h3 {
+            color: #333;
+        }
+
+        /* Tables */
+        table {
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        /* Inputs */
+        .stNumberInput input, .stTextInput input {
+            border-radius: 8px;
+        }
+
+        /* Success & warning boxes */
+        .stAlert {
+            border-radius: 10px !important;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+# st.title("💸 GenZ Finance Advisor — Should You Buy It?")
+# st.write("Simulate your financial health before making a purchase. Works for cars, luxury items, gadgets, or any goal!")
+st.markdown(
+    """
+    <div style="text-align:center; padding: 1.5rem 0;">
+        <h1 style="font-size:2.8rem; color:#1E1E1E;">💰 <span style="color:#6C63FF;">BigMoneyEnergy</span></h1>
+        <p style="font-size:1.2rem; color:gray;">
+            Your AI that helps you flex adult money — <b>responsibly</b>.
+        </p>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
 
 inputs = inputs_panel()
 
