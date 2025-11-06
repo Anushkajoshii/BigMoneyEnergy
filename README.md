@@ -1,18 +1,18 @@
-#BigMoneyEnergy 
-##Your AI that helps you flex adult money — responsibly.
+# BigMoneyEnergy 
+### Your AI that helps you flex adult money — responsibly.
 
-AI-powered Personal Finance Simulator — simulate purchases, test loan options, and get AI-driven “Buy vs Wait” recommendations in an interactive Streamlit app.
+**AI-powered Personal Finance Simulator — simulate purchases, test loan options, and get AI-driven “Buy vs Wait” recommendations in an interactive Streamlit app.**
 
 ---
 
-##🚀 Overview
+## 🚀 Overview
 BigMoneyEnergy helps users make smarter financial decisions by simulating future savings and risks using Monte Carlo simulations and Groq AI models. It analyzes income, expenses, and savings patterns to recommend whether to **Buy Now, Wait, or Save More**.
 
 **Tech Stack:** Python, Streamlit, Groq API, NumPy, Pandas, Scikit-learn, Matplotlib, Plotly, ReportLab
 
 ---
 
-##🧠 Features
+## 🧠 Features
 - **💸 Monte Carlo Simulations** — Forecast savings and financial shortfall probabilities.
 - **🏦 EMI & Loan Modeling** — Compute EMI, total interest, and affordability scenarios.
 - **🧮 AI Financial Advisor (Groq)** — Get personalized, conversational financial guidance.
