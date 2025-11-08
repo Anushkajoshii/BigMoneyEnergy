@@ -17,4 +17,4 @@ __pycache__/
 *.parquet
 .fin/
 .env
-.log
+.logstreamlit/
