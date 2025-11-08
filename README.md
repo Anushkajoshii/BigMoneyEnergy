@@ -32,7 +32,7 @@ cd BigMoneyEnergy
 
 ### 2️⃣ Install Dependencies
 ```bash
-python -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
@@ -46,6 +46,27 @@ streamlit run streamlit.py
 ### 4️⃣ Run Tests
 ```bash
 PYTHONPATH=. pytest -q
+```
+
+## Run locally (Docker)
+
+Build:
+```bash
+docker build -t bigmoneyenergy .
+```
+Run:
+```bash
+docker run -p 8501:8501 bigmoneyenergy
+
+# if .streamlit/secrets.toml for api hosted on streamlit
+docker run --rm -p 8501:8501 \
+  -v "$(pwd)/.streamlit:/home/appuser/.streamlit:ro" \
+  bigmoneyenergy:local
+```
+Or with docker-compose:
+
+```bash
+docker-compose up --build
 ```
 
 ---

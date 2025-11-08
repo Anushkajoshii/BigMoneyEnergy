@@ -18,3 +18,7 @@ __pycache__/
 .fin/
 .env
 .logstreamlit/
+.streamlit/secrets.toml
+# data/
+# models/model_archive/
+# tests/

@@ -1,0 +1,11 @@
+__pycache__
+*.pyc
+*.pyo
+.env
+venv
+.envrc
+.git
+.dockerignore
+data/
+models/model_archive/
+tests/
