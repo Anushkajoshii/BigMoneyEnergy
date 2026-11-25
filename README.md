@@ -1,6 +1,9 @@
 # BigMoneyEnergy 
 ### Your AI that helps you flex adult money — responsibly.
 
+**Live demo:** https://bigmoneyenergy.streamlit.app
+
+
 **AI-powered Personal Finance Simulator — simulate purchases, test loan options, and get AI-driven “Buy vs Wait” recommendations in an interactive Streamlit app.**
 
 ---

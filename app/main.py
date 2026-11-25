@@ -121,8 +121,9 @@ if inputs["purchase_type"] == "EMI-based purchase":
 
 # Run simulation
 st.header("🎲 Monte Carlo Risk Simulation")
-horizon_months = st.slider("Simulation horizon (months)", 6, 60, 24, 6)
-sims = st.selectbox("Number of simulations", [1000, 3000, 5000], index=1)
+with st.expander("Simulation settings (optional)"):
+    horizon_months = st.slider("Simulation horizon (months)", 6, 60, 24, 6)
+    sims = st.selectbox("Number of simulations", [1000, 3000, 5000], index=1)
 
 with st.spinner("Running financial simulation..."):
     mc = monte_carlo_purchase_risk(
@@ -169,15 +170,29 @@ else:
     st.warning(recommendation)
     st.write("- Increase monthly savings or delay purchase.")
     st.write("- Reduce price range or EMI duration for safer outcomes.")
-ai_text = get_ai_explanation(
-    snapshot,
-    inputs['product_name'],
-    {"prob_shortfall": mc["prob_shortfall"], "loan_payment": loan_payment, **mc["stats"]},
-    recommendation
-)
+@st.cache_data(show_spinner=False, ttl=3600)
+def cached_ai_explanation(snapshot, product_name, simulation_stats, recommendation):
+    # Cached so moving a slider does not call the LLM again for the same inputs.
+    return get_ai_explanation(snapshot, product_name, simulation_stats, recommendation)
+
 
 st.markdown("### 💬 AI Advisor’s Take")
-st.write(ai_text)
+sim_stats = {
+    "prob_shortfall": float(mc["prob_shortfall"]),
+    "loan_payment": float(loan_payment),
+    **{k: float(v) for k, v in mc["stats"].items() if isinstance(v, (int, float))},
+}
+if st.button("Get AI advice", key="ai_advice"):
+    st.session_state["ai_requested"] = True
+
+if st.session_state.get("ai_requested"):
+    with st.spinner("Asking the AI advisor..."):
+        ai_text, used_ai = cached_ai_explanation(snapshot, inputs["product_name"], sim_stats, recommendation)
+    if not used_ai:
+        st.caption("The AI advisor is busy right now, so here is a rule-based summary instead.")
+    st.markdown(ai_text)
+else:
+    st.caption("Click the button for a plain-language explanation of this result.")
 
 st.header("📊 Financial Snapshot")
 st.table(pd.DataFrame([snapshot]).T.rename(columns={0: "Value"}))

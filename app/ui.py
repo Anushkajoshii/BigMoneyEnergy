@@ -2,6 +2,7 @@ import streamlit as st
 
 def inputs_panel(prefix=""):
     st.sidebar.header("Your Financial Snapshot")
+    st.sidebar.caption("Filled with a sample profile. Change any number to see your own result.")
 
     monthly_net_income = st.sidebar.number_input(
         "Monthly Net Income (₹)", value=100000, step=5000, key=f"{prefix}monthly_net_income"
@@ -15,15 +16,16 @@ def inputs_panel(prefix=""):
     savings_balance = st.sidebar.number_input(
         "Current Savings (₹)", value=300000, step=10000, key=f"{prefix}savings_balance"
     )
-    emergency_target = st.sidebar.number_input(
-        "Target Emergency Fund (₹)", value=250000, step=10000, key=f"{prefix}emergency_target"
-    )
-    debt_monthly = st.sidebar.number_input(
-        "Existing Monthly Debt (₹)", value=0, step=1000, key=f"{prefix}debt_monthly"
-    )
-    monthly_additional_savings = st.sidebar.number_input(
-        "Monthly Savings Contribution (₹)", value=10000, step=1000, key=f"{prefix}monthly_additional_savings"
-    )
+    with st.sidebar.expander("More details (optional)"):
+        emergency_target = st.number_input(
+            "Target Emergency Fund (₹)", value=250000, step=10000, key=f"{prefix}emergency_target"
+        )
+        debt_monthly = st.number_input(
+            "Existing Monthly Debt (₹)", value=0, step=1000, key=f"{prefix}debt_monthly"
+        )
+        monthly_additional_savings = st.number_input(
+            "Monthly Savings Contribution (₹)", value=10000, step=1000, key=f"{prefix}monthly_additional_savings"
+        )
 
     purchase_type = st.radio(
         "Select Purchase Type",
